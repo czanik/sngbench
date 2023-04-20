@@ -1,0 +1,11 @@
+czp_maxperf,-i -r 3000000 --active-connections=1 -S -C 127.0.0.1 514,
+czp_maxperf,-i -r 3000000 --active-connections=10 -S -C 127.0.0.1 514,
+czp_maxperf,-i -r 3000000 --active-connections=50 -S -C 127.0.0.1 514,
+czp_maxperf,-i -r 3000000 --active-connections=128 -S -C 127.0.0.1 514,
+czp_maxperf,-i -r 3000000 --active-connections=32 -S -C 127.0.0.1 514,-i -r 3000000 --active-connections=32 -S -C 127.0.0.1 515,-i -r 3000000 --active-connections=32 -S -C 127.0.0.1 516,-i -r 3000000 --active-connections=32 -S -C 127.0.0.1 517
+czp_maxperf,-i -r 3000000 --active-connections=128 -S -C 127.0.0.1 514,-i -r 3000000 --active-connections=128 -S -C 127.0.0.1 515,-i -r 3000000 --active-connections=128 -S -C 127.0.0.1 516,-i -r 3000000 --active-connections=128 -S -C 127.0.0.1 517
+czp_distro,-i -r 3000000 --active-connections=1 -S -C 127.0.0.1 514,
+czp_distro,-i -r 3000000 --active-connections=10 -S -C 127.0.0.1 514,
+czp_distro,-i -r 3000000 --active-connections=50 -S -C 127.0.0.1 514,
+czp_distro,-i -r 3000000 --active-connections=128 -S -C 127.0.0.1 514,
+czp_distro,-i -r 3000000 --active-connections=32 -S -C 127.0.0.1 514,-i -r 3000000 --active-connections=32 -S -C 127.0.0.1 514,-i -r 3000000 --active-connections=32 -S -C 127.0.0.1 514,-i -r 3000000 --active-connections=32 -S -C 127.0.0.1 514

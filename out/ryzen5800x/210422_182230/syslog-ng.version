@@ -1,0 +1,16 @@
+syslog-ng 3 (3.26.1)
+Config version: 3.22
+Installer-Version: 3.26.1
+Revision: 
+Module-Directory: /usr/lib64/syslog-ng
+Module-Path: /usr/lib64/syslog-ng
+Include-Path: /usr/share/syslog-ng/include
+Available-Modules: add-contextual-data,affile,afprog,afsocket,afstomp,afuser,appmodel,azure-auth-header,basicfuncs,cef,confgen,cryptofuncs,csvparser,dbparser,disk-buffer,examples,graphite,hook-commands,json-plugin,kvformat,linux-kmsg-format,map-value-pairs,pseudofile,sdjournal,snmptrapd-parser,stardate,syslogformat,system-source,tags-parser,tfgetent,timestamp,xml
+Enable-Debug: off
+Enable-GProf: off
+Enable-Memtrace: off
+Enable-IPv6: on
+Enable-Spoof-Source: on
+Enable-TCP-Wrapper: on
+Enable-Linux-Caps: on
+Enable-Systemd: on
