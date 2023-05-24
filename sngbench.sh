@@ -10,6 +10,7 @@ output_dir=''
 syslog_ng=''
 syslog_ng_ctl=''
 syslog_ng_loggen=''
+test_run_count=3
 
 print_error()
 {
@@ -38,6 +39,8 @@ check_prerequisites()
     local prerequisites=(
         'cp'
         'date'
+        'grep'
+        'head'
         'loggen'
         'mkdir'
         'pgrep'
@@ -67,6 +70,11 @@ setup_output_dir()
     fi
 
     mkdir -p "${output_dir}"
+
+    for ((i=0; i < test_run_count; i++))
+    do
+        mkdir "${output_dir}/run_$((i + 1))"
+    done
 }
 
 set_syslog_ng_paths()
@@ -136,6 +144,24 @@ wait_for_syslog_ng_to_start()
     fi
 }
 
+get_file_names_in_directory_by_extension()
+{
+    local directory="$1"
+    local extension=".$2"
+
+    (
+        cd "${directory}"
+
+        set +f
+
+        for _file in $(printf '%s\n' *"${extension}")
+        do
+            printf '%s\n' "$_file"
+        done
+
+        set -f
+    )
+}
 
 run_benchmark()
 {
@@ -146,46 +172,110 @@ run_benchmark()
         '/var/log/fromnet4'
     )
 
-    while IFS= read -r line
+    for ((i=0; i < test_run_count; i++))
     do
-        config_name="${line/,*/}"
-        loggen_parameters_list=()
-        loggen_pids=()
-
-        "${syslog_ng}" --no-caps -f "${config_dir}/${config_name}"
-
-        wait_for_syslog_ng_to_start 10
-
-        IFS=',' read -r -a loggen_parameters_list <<< "${line#*,}"
-
-        for ((i=0; i < ${#loggen_parameters_list[@]}; i++))
+        while IFS= read -r line
         do
-            loggen_parameter_list="${loggen_parameters_list[${i}]}"
-            loggen_output_path="${loggen_parameter_list// /_}"
-            loggen_output_path="${loggen_output_path//-/}"
-            loggen_output_path="${loggen_output_path//=/_}"
-            loggen_output_path="${output_dir}/${config_name}.${loggen_output_path}.$((i + 1)).csv"
-            loggen_arguments=()
+            config_name="${line/,*/}"
+            loggen_parameters_list=()
+            loggen_pids=()
 
-            IFS=' ' read -r -a loggen_arguments <<< "${loggen_parameter_list}"
+            "${syslog_ng}" --no-caps -f "${config_dir}/${config_name}"
 
-            "${syslog_ng_loggen}" "${loggen_arguments[@]}" &> "${loggen_output_path}" &
+            wait_for_syslog_ng_to_start 10
 
-            loggen_pids+=($!)
+            IFS=',' read -r -a loggen_parameters_list <<< "${line#*,}"
+
+            for ((j=0; j < ${#loggen_parameters_list[@]}; j++))
+            do
+                loggen_parameter_list="${loggen_parameters_list[${j}]}"
+                loggen_output_path="${loggen_parameter_list// /_}"
+                loggen_output_path="${loggen_output_path//-/}"
+                loggen_output_path="${loggen_output_path//=/_}"
+                loggen_output_path="${output_dir}/run_$((i + 1))/${config_name}.${loggen_output_path}.$((j + 1)).csv"
+                loggen_arguments=()
+
+                IFS=' ' read -r -a loggen_arguments <<< "${loggen_parameter_list}"
+
+                "${syslog_ng_loggen}" "${loggen_arguments[@]}" &> "${loggen_output_path}" &
+
+                loggen_pids+=($!)
+            done
+
+            for loggen_pid in "${loggen_pids[@]}"
+            do
+                wait "${loggen_pid}"
+            done
+
+            stop_syslog_ng 10
+
+            for log_file_to_remove in "${log_files_to_remove[@]}"
+            do
+                rm -f "${log_file_to_remove}" || true
+            done
+        done < "${input_file}"
+    done
+}
+
+sum_results()
+{
+    local result_file_list
+    local result_files=()
+    local result_file_lists=()
+    local output_file="${output_dir}/results.csv"
+
+    for ((i=0; i < test_run_count; i++))
+    do
+        result_file_lists+=("$(get_file_names_in_directory_by_extension "${output_dir}/run_$((i + 1))" 'csv')")
+    done
+
+    result_file_list="${result_file_lists[0]}"
+
+    for other_result_file_list in "${result_file_lists[@]}"
+    do
+        if [[ "${result_file_list}" != "${other_result_file_list}" ]]
+        then
+            print_error                                                      \
+                'The number of result files is different between test runs!' \
+                'Exiting...'
+
+            exit 4
+        fi
+    done
+
+    mapfile -t result_files <<< "${result_file_list}"
+
+    for result_file in "${result_files[@]}"
+    do
+        config_name="${result_file/.*/}"
+        loggen_parameters="${result_file#*.}"
+        loggen_parameters="${loggen_parameters%.*}"
+        loggen_parameters="${loggen_parameters%.*}"
+        loggen_num="${result_file%.*}"
+        loggen_num="${loggen_num##*.}"
+
+        printf                                                  \
+            '%s'                                                \
+            "${config_name},${loggen_parameters},${loggen_num}" \
+            >> "${output_file}"
+
+        measured_values=''
+
+        for ((i=0; i < test_run_count; i++))
+        do
+            _stat="$(
+                grep 'average rate' "${output_dir}/run_$((i + 1))/${result_file}" \
+                | head -1
+            )"
+
+            _stat="${_stat##*average rate = }"
+            _stat="${_stat%% *}"
+
+            measured_values="${measured_values},${_stat}"
         done
 
-        for loggen_pid in "${loggen_pids[@]}"
-        do
-            wait "${loggen_pid}"
-        done
-
-        stop_syslog_ng 10
-
-        for log_file_to_remove in "${log_files_to_remove[@]}"
-        do
-            rm -f "${log_file_to_remove}" || true
-        done
-    done < "${input_file}"
+        printf '%s\n' "${measured_values}" >> "${output_file}"
+    done
 }
 
 main()
@@ -196,6 +286,7 @@ main()
     stop_syslog_ng 10
     save_system_info
     run_benchmark
+    sum_results
 }
 
 main
