@@ -17,6 +17,18 @@ print_error()
     printf '%s\n' "$*" >&2
 }
 
+print_begin()
+{
+    local message="$1"
+
+    printf '%s...' "${message}"
+}
+
+print_done()
+{
+    printf ' %s\n' 'Done.'
+}
+
 get_executable_path()
 {
     local executable_name="$1"
@@ -50,10 +62,14 @@ check_prerequisites()
         'uname'
     )
 
+    print_begin 'Checking prerequisites'
+
     for prerequisite in "${prerequisites[@]}"
     do
         get_executable_path "${prerequisite}" > /dev/null
     done
+
+    print_done
 }
 
 setup_output_dir()
@@ -68,6 +84,8 @@ setup_output_dir()
 
         exit 2
     fi
+
+    printf '%s\n' "Results will be saved into '${output_dir}'."
 
     mkdir -p "${output_dir}"
 
@@ -86,6 +104,8 @@ set_syslog_ng_paths()
 
 save_system_info()
 {
+    print_begin 'Saving system info'
+
     "${syslog_ng}" --version > "${output_dir}/syslog-ng.version"
     uname -a > "${output_dir}/uname.out"
 
@@ -96,6 +116,8 @@ save_system_info()
             cp "${_file}" "${output_dir}/"
         fi
     done
+
+    print_done
 }
 
 stop_syslog_ng()
@@ -104,11 +126,16 @@ stop_syslog_ng()
     local syslog_ng_pids
     local exit_status=0
 
+    print_begin 'Stopping syslog-ng'
+
     syslog_ng_pids="$(pgrep 'syslog-ng' || true)"
 
     if [[ -n "${syslog_ng_pids}" ]]
     then
-        "${syslog_ng_ctl}" stop || true
+        "${syslog_ng_ctl}"                            \
+            stop                                      \
+            >> "${output_dir}/syslog-ng-ctl.out" 2>&1 \
+            || true
     fi
 
     timeout "${timeout_in_sec}"                                                                       \
@@ -123,6 +150,8 @@ stop_syslog_ng()
 
         exit 3
     fi
+
+    print_done
 }
 
 wait_for_syslog_ng_to_start()
@@ -174,15 +203,24 @@ run_benchmark()
 
     for ((i=0; i < test_run_count; i++))
     do
+        printf '%s\n' "Test run #$((i + 1)):"
+
         while IFS= read -r line
         do
             config_name="${line/,*/}"
             loggen_parameters_list=()
             loggen_pids=()
 
-            "${syslog_ng}" --no-caps -f "${config_dir}/${config_name}"
+            print_begin "Starting syslog-ng with config '${config_dir}/${config_name}'"
+
+            "${syslog_ng}"                        \
+                --no-caps                         \
+                -f "${config_dir}/${config_name}" \
+                >> "${output_dir}/syslog-ng.out" 2>&1
 
             wait_for_syslog_ng_to_start 10
+
+            print_done
 
             IFS=',' read -r -a loggen_parameters_list <<< "${line#*,}"
 
@@ -197,14 +235,22 @@ run_benchmark()
 
                 IFS=' ' read -r -a loggen_arguments <<< "${loggen_parameter_list}"
 
+                print_begin "Starting loggen #$((j + 1))"
+
                 "${syslog_ng_loggen}" "${loggen_arguments[@]}" &> "${loggen_output_path}" &
 
                 loggen_pids+=($!)
+
+                print_done
             done
 
-            for loggen_pid in "${loggen_pids[@]}"
+            for ((j=0; j < ${#loggen_pids[@]}; j++))
             do
-                wait "${loggen_pid}"
+                print_begin "Waiting for loggen #$((j + 1))"
+
+                wait "${loggen_pids["${j}"]}"
+
+                print_done
             done
 
             stop_syslog_ng 10
@@ -223,6 +269,8 @@ sum_results()
     local result_files=()
     local result_file_lists=()
     local output_file="${output_dir}/results.csv"
+
+    print_begin 'Processing results'
 
     for ((i=0; i < test_run_count; i++))
     do
@@ -276,6 +324,8 @@ sum_results()
 
         printf '%s\n' "${measured_values}" >> "${output_file}"
     done
+
+    print_done
 }
 
 main()
