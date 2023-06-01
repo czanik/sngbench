@@ -1,23 +1,23 @@
-@version:3.35
+@version:4.2
 # First, set some global options.
 options { chain_hostnames(off); use_dns(no); use_fqdn(no); dns_cache(no);
-          perm(0640); stats_freq(0);
+          perm(0640);
           threaded(yes);
           log_fifo_size(200000); flush_lines(10000);
 };
 
-source s_net1 { tcp(port(514) max_connections(128) log_iw_size(100000)); };
+source s_net1 { tcp(port(514) max_connections(128) log-fetch-limit(10) log_iw_size(128000)); };
 destination d_fromnet1 { file("/var/log/fromnet1"); };
 log { source(s_net1); destination(d_fromnet1); };
 
-source s_net2 { tcp(port(515) max_connections(128) log_iw_size(100000)); };
+source s_net2 { tcp(port(515) max_connections(128) log-fetch-limit(10)  log_iw_size(128000)); };
 destination d_fromnet2 { file("/var/log/fromnet2"); };
 log { source(s_net2); destination(d_fromnet2); };
 
-source s_net3 { tcp(port(516) max_connections(128) log_iw_size(100000)); };
+source s_net3 { tcp(port(516) max_connections(128) log-fetch-limit(10)  log_iw_size(128000)); };
 destination d_fromnet3 { file("/var/log/fromnet3"); };
 log { source(s_net3); destination(d_fromnet3); };
 
-source s_net4 { tcp(port(517) max_connections(128) log_iw_size(100000)); };
+source s_net4 { tcp(port(517) max_connections(128) log-fetch-limit(10)  log_iw_size(128000)); };
 destination d_fromnet4 { file("/var/log/fromnet4"); };
 log { source(s_net4); destination(d_fromnet4); };
